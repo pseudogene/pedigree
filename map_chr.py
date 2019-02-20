@@ -1,12 +1,14 @@
 import argparse
+import os
 import seaborn as sns
 
 sns.set()
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--karyotype', dest='karyotype', type=argparse.FileType('rU'), required=True, help='Path to the karyotype file (BED format)')
-# parser.add_argument('--fb', dest='fb', help='Path to RFmix FB output')
-parser.add_argument('--msp', dest='msp', type=argparse.FileType('rU'), required=True, help='Path to RFmix MSP output')
+parser.add_argument('--fb', dest='fb', type=argparse.FileType('rU'), help='Path to RFmix FB output')
+parser.add_argument('--t', dest='threshold', type=float, default=0.50, help='Threshold for identification')
+parser.add_argument('--msp', dest='msp', type=argparse.FileType('rU'), help='Path to RFmix MSP output')
 parser.add_argument('--chr', dest='chrm', help='Include only the specified chromosome')
 parser.add_argument('--sample', dest='sample', help='Include only the specified sample')
 parser.add_argument('--prefix', dest='prefix', default='output', help='Output prefix')
@@ -22,11 +24,15 @@ samples = []
 genome = {}
 maxchrm = 0
 
+if args.fb is None and args.msp is None:
+    parser.print_help()
+    exit(1)
+
 if args.html is False and args.bed is False and args.r is False:
     args.bed = True
 
 # Read karyotype
-if args.karyotype is not None and args.msp is not None:
+if args.karyotype is not None and (args.msp is not None or args.fb is not None):
     for line in args.karyotype:
         tabs = line[:-1].split('\t')
         if args.chrm is None or args.chrm == tabs[0]:
@@ -35,42 +41,125 @@ if args.karyotype is not None and args.msp is not None:
                 maxchrm = int(tabs[2])
     args.karyotype.close()
 
-    # Read Group names
-    # #Subpopulation order/codes: AND=0	AUR=1	...
-    line = args.msp.readline()
-    for tmp in line[28:-1].split('\t'):
-        tab = tmp.split('=')
-        group[int(tab[1])] = tab[0]
+    if args.fb is None and args.msp is not None:
 
-    # ReadSample names
-    # #chm	spos	epos	sgpos	egpos	n snps	Col340.0	Col340.1	Col341.0	Col341.1	...
-    line = args.msp.readline()
-    count = 0
-    for tmp in line[:-1].split('\t')[6:]:
-        count += 1
-        if count % 2 == 0:
-            samples.append(tmp[:-2])
+        # Read Group names
+        # #Subpopulation order/codes: AND=0	AUR=1	...
+        line = args.msp.readline()
+        for tmp in line[28:-1].split('\t'):
+            tab = tmp.split('=')
+            group[int(tab[1])] = tab[0]
+        #group = list(group)
 
-    # Read Chromosome structures
-    # NC_031974.2	10728	3669032	0.00	10.39	22	9	9	9	9	9	9	9	...
-    for line in args.msp:
-        if args.chrm is None or args.chrm in line:
-            tabs = line[:-1].split('\t')
-            if tabs[0] in karyotype:
-                if tabs[0] not in genome:
-                    genome[tabs[0]] = {}
-                count = 0
-                for tmp in tabs[6:]:
-                    sampleid = (count - count % 2) / 2
-                    if args.sample is None or args.sample == samples[int(sampleid)]:
-                        if samples[int(sampleid)] not in genome[tabs[0]]:
-                            genome[tabs[0]][samples[int(sampleid)]] = {}
-                        if count % 2 not in genome[tabs[0]][samples[int(sampleid)]]:
-                            genome[tabs[0]][samples[int(sampleid)]][count % 2] = {}
-                        if tabs[1] not in genome[tabs[0]][samples[int(sampleid)]][count % 2]:
-                            genome[tabs[0]][samples[int(sampleid)]][count % 2][(tabs[1], tabs[2])] = tmp
-                    count += 1
-    args.msp.close()
+        # ReadSample names
+        # #chm	spos	epos	sgpos	egpos	n snps	Col340.0	Col340.1	Col341.0	Col341.1	...
+        line = args.msp.readline()
+        count = 0
+        for tmp in line[:-1].split('\t')[6:]:
+            count += 1
+            if count % 2 == 0:
+                samples.append(tmp[:-2])
+        #samples = list(samples)
+
+        # Read Chromosome structures
+        # NC_031974.2	10728	3669032	0.00	10.39	22	9	9	9	9	9	9	9	...
+        for line in args.msp:
+            if args.chrm is None or args.chrm in line:
+                tabs = line[:-1].split('\t')
+                if tabs[0] in karyotype:
+                    if tabs[0] not in genome:
+                        genome[tabs[0]] = {}
+                    count = 0
+                    for tmp in tabs[6:]:
+                        sampleid = (count - count % 2) / 2
+                        if args.sample is None or args.sample == samples[int(sampleid)]:
+                            if samples[int(sampleid)] not in genome[tabs[0]]:
+                                genome[tabs[0]][samples[int(sampleid)]] = {}
+                            if count % 2 not in genome[tabs[0]][samples[int(sampleid)]]:
+                                genome[tabs[0]][samples[int(sampleid)]][count % 2] = {}
+                            if tabs[1] not in genome[tabs[0]][samples[int(sampleid)]][count % 2]:
+                                genome[tabs[0]][samples[int(sampleid)]][count % 2][(tabs[1], tabs[2])] = tmp
+                        count += 1
+        args.msp.close()
+
+    if args.fb is not None:
+        samples2 = []
+
+        # Read Group names
+        # #reference_panel_population:	AND	AUR	CAN	GAL	HOR	KAR	MAC	MEL	MOS	MOS-S	NIL	NIL-E	ZIL
+        line = args.fb.readline()
+        count = 0
+        for tmp in line[:-1].split('\t')[1:]:
+            if not tmp.startswith('#'):
+                group[count] = tmp
+                count += 1
+        #group = list(group)
+
+        # ReadSample names
+        # chromosome	physical_position	genetic_position	genetic_marker_index	Md-091:::hap1:::AND	Md-091:::hap1:::AUR	Md-091:::hap1:::CAN	Md-091:::hap1:::GAL
+        line = args.fb.readline()
+        count = 0
+        for tmp in line[:-1].split('\t')[4:]:
+            count += 1
+            if count % (2 * len(group)) == 0:
+                samples.append(tmp.split(':::')[0])
+            samples2.append(tmp)
+        #samples = list(samples)
+
+        # Read Chromosome structures
+        # NC_031987.2	102378	0.00000	0	1.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	1.00000
+        last_pos = None
+        for line in args.fb:
+            if args.chrm is None or args.chrm in line:
+                tabs = line[:-1].split('\t')
+                if tabs[0] in karyotype:
+                    if tabs[0] not in genome:
+                        genome[tabs[0]] = {}
+                        last_pos = tabs[1]
+
+                    count = 0
+                    last_sample = None
+                    last_chr = None
+                    tmpmax = 0
+                    tmpgp = None
+                    for tmp in tabs[4:]:
+                        sampleid = int((count - count % (2 * len(group))) / (2 * len(group)))
+                        chrid = int(((count - count % len(group)) / len(group)) % 2)
+                        groupid = int(count % len(group))
+                        if samples[sampleid] == 'Bk_F10':
+                            print('sample:', sampleid, samples[sampleid], 'chr:', chrid, 'group:', groupid, group[groupid], float(tmp), samples2[count])
+                        if last_sample is None:
+                            last_sample = sampleid
+                            last_chr = chrid
+                            tmpmax = 0
+                            tmpgp = None
+                        elif last_sample == sampleid and last_chr == chrid:
+                            if tmpmax < float(tmp):
+                                tmpmax = float(tmp)
+                                tmpgp = groupid
+                        else:
+                            if tmpgp is not None and tmpmax >= args.threshold:
+                                if samples[last_sample] not in genome[tabs[0]]:
+                                    genome[tabs[0]][samples[last_sample]] = {}
+                                if last_chr not in genome[tabs[0]][samples[last_sample]]:
+                                    genome[tabs[0]][samples[last_sample]][last_chr] = {}
+                                if tabs[1] not in genome[tabs[0]][samples[last_sample]][last_chr]:
+                                    genome[tabs[0]][samples[last_sample]][last_chr][(last_pos, tabs[1])] = tmpgp
+                            last_sample = sampleid
+                            last_chr = chrid
+                            tmpmax = 0
+                            tmpgp = None
+
+                        count += 1
+                    if tmpgp is not None and tmpmax >= args.threshold:
+                        if samples[last_sample] not in genome[tabs[0]]:
+                            genome[tabs[0]][samples[last_sample]] = {}
+                        if last_chr not in genome[tabs[0]][samples[last_sample]]:
+                            genome[tabs[0]][samples[last_sample]][last_chr] = {}
+                        if tabs[1] not in genome[tabs[0]][samples[last_sample]][last_chr]:
+                            genome[tabs[0]][samples[last_sample]][last_chr][(last_pos, tabs[1])] = tmpgp
+                    last_pos = tabs[1]
+        args.fb.close()
 
     # Analyse/Compact the chromosome structures
     output = {}
@@ -132,7 +221,7 @@ if args.karyotype is not None and args.msp is not None:
                         htmlout.write('        <div class="chrom' + str(strand + 1) + '" style="width: ' + str(round(int(karyotype[chrm][2]) * 100 / maxchrm, 4)) + '%;">\n')
                         for segment in output[sample][chrm][strand]:
                             htmlout.write('          <div class="segment" data-species-id="' + group[segment[0]] + '" style="width: ' + str(round((segment[2] - segment[1]) * scale, 4)) + '%; left: ' + str(round(segment[1] * scale, 4)) + '%; background-color: rgb(' + str(int(colours[segment[0]][0]*255)) + ', ' + str(int(colours[segment[0]][1]*255)) + ', ' + str(int(colours[segment[0]][2]*255)) + ');"></div>\n')
-                        if len(karyotype[chrm]) > 5:
+                        if len(karyotype[chrm]) >= 5:
                             htmlout.write('<div class="centromere" style="left: ' + str(round(int(karyotype[chrm][4]) * scale, 4)) + '%;"></div>\n')
                         htmlout.write('        </div>\n')
                     htmlout.write('      </div>\n    </div>\n')
