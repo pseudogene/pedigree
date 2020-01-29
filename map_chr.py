@@ -1,5 +1,31 @@
+#! /usr/bin/env python
+# Copyright 2020 Michaël Bekaert. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+#    1. Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#
+#    2. Redistributions in binary form must reproduce the above
+#       copyright notice, this list of conditions and the following
+#       disclaimer in the documentation and/or other materials provided
+#       with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY DIRECT,
+# INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+# STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+# IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
 import argparse
-import os
 import seaborn as sns
 
 sns.set()
@@ -16,7 +42,7 @@ parser.add_argument('--bed', dest='bed', action='store_true', help='Output BED f
 parser.add_argument('--html', dest='html', action='store_true', help='Output HTML format')
 parser.add_argument('--nojs', dest='nojs', action='store_true', help='No dynamic HTML')
 parser.add_argument('--R', dest='r', action='store_true', help='Output R ready format [not implemented]')
-args = parser.parse_args()
+args = parser.parse_args(['-h'])
 
 karyotype = {}
 group = {}
@@ -49,7 +75,7 @@ if args.karyotype is not None and (args.msp is not None or args.fb is not None):
         for tmp in line[28:-1].split('\t'):
             tab = tmp.split('=')
             group[int(tab[1])] = tab[0]
-        #group = list(group)
+        # group = list(group)
 
         # ReadSample names
         # #chm	spos	epos	sgpos	egpos	n snps	Col340.0	Col340.1	Col341.0	Col341.1	...
@@ -59,7 +85,7 @@ if args.karyotype is not None and (args.msp is not None or args.fb is not None):
             count += 1
             if count % 2 == 0:
                 samples.append(tmp[:-2])
-        #samples = list(samples)
+        # samples = list(samples)
 
         # Read Chromosome structures
         # NC_031974.2	10728	3669032	0.00	10.39	22	9	9	9	9	9	9	9	...
@@ -93,7 +119,7 @@ if args.karyotype is not None and (args.msp is not None or args.fb is not None):
             if not tmp.startswith('#'):
                 group[count] = tmp
                 count += 1
-        #group = list(group)
+        # group = list(group)
 
         # ReadSample names
         # chromosome	physical_position	genetic_position	genetic_marker_index	Md-091:::hap1:::AND	Md-091:::hap1:::AUR	Md-091:::hap1:::CAN	Md-091:::hap1:::GAL
@@ -104,7 +130,7 @@ if args.karyotype is not None and (args.msp is not None or args.fb is not None):
             if count % (2 * len(group)) == 0:
                 samples.append(tmp.split(':::')[0])
             samples2.append(tmp)
-        #samples = list(samples)
+        # samples = list(samples)
 
         # Read Chromosome structures
         # NC_031987.2	102378	0.00000	0	1.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	0.00000	1.00000
